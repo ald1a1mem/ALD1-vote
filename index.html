@@ -218,6 +218,7 @@
       font-size: 0.84rem;
       color: var(--accent-deep);
       min-height: 1.2em;
+      word-break: break-word;
     }
 
     /* 最底部固定來源 */
@@ -277,6 +278,7 @@
   <script>
     const ONESIGNAL_APP_ID = "a9d9082b-0e43-4ba1-b5fb-9f444247f0f8";
     const TAGS = ["團體", "俊抒", "ARNO", "LEO", "虔佑", "相沅", "鑫隆", "安信", "相炫"];
+    const NOTIFY_STORAGE_KEY = "ald1_notify_pref_v1";
 
     // 行程資料：日期、時間、行程名稱、標籤（時間過了會自動隱藏）
     const SCHEDULES = [
@@ -337,9 +339,11 @@
 
     let selectedTag = "全部";
     let oneSignalReady = false;
+    let oneSignalInstance = null;
 
     window.OneSignalDeferred = window.OneSignalDeferred || [];
     OneSignalDeferred.push(async function(OneSignal) {
+      oneSignalInstance = OneSignal;
       await OneSignal.init({
         appId: ONESIGNAL_APP_ID,
         allowLocalhostAsSecureOrigin: true
@@ -441,7 +445,7 @@
         : activeVotes.filter((item) => item.tag === selectedTag);
 
       if (filtered.length === 0) {
-        list.innerHTML = `<div class="empty-msg">目前沒有「${selectedTag}」的進行中或即將開始投票</div>`;
+        list.innerHTML = `<div class="empty-msg">目前沒有「${selectedTag}」進行中或即將開始的投票</div>`;
         return;
       }
 
@@ -464,26 +468,58 @@
       }).join("");
     }
 
-    const NOTIFY_STORAGE_KEY = "ald1_notify_pref_v1";
+    function buildTagPayload(checkedTags) {
+      const tagPayload = {};
+      TAGS.forEach((t, idx) => {
+        tagPayload[`tag_${idx + 1}`] = checkedTags.includes(t) ? "1" : "0";
+      });
+      return tagPayload;
+    }
 
-    async function syncOneSignalSubscription(enabled, checkedTags) {
-      if (!oneSignalReady || !window.OneSignal) return;
+    async function syncOneSignalSubscription(enabled, checkedTags, requestPermIfNeeded = false) {
+      const statusEl = document.getElementById("notifyStatus");
+      const sdk = oneSignalInstance || window.OneSignal;
+
+      if (!oneSignalReady || !sdk) {
+        if (statusEl && enabled) {
+          statusEl.textContent = "通知元件載入中，請稍後再試一次...";
+        }
+        return;
+      }
+
       try {
         if (enabled) {
-          if (!OneSignal.Notifications.permission) {
-            await OneSignal.Notifications.requestPermission();
+          if (!sdk.Notifications.permission && requestPermIfNeeded) {
+            await sdk.Notifications.requestPermission();
           }
-          await OneSignal.User.PushSubscription.optIn();
-          const tagPayload = {};
-          TAGS.forEach((t) => {
-            tagPayload[`tag_${t}`] = checkedTags.includes(t) ? "1" : "0";
-          });
-          await OneSignal.User.addTags(tagPayload);
+
+          if (!sdk.Notifications.permission) {
+            if (statusEl) {
+              statusEl.textContent = "尚未取得瀏覽器通知權限（請取消再重新勾選一次，或確認瀏覽器未封鎖通知）";
+            }
+            return;
+          }
+
+          await sdk.User.PushSubscription.optIn();
+          await sdk.User.addTags(buildTagPayload(checkedTags));
+
+          const subId = sdk.User.PushSubscription.id;
+          if (statusEl) {
+            statusEl.textContent = subId
+              ? `推播已訂閱（ID: ${subId}｜標籤：${checkedTags.length ? checkedTags.join("、") : "無"}）`
+              : `已儲存通知偏好（目前勾選：${checkedTags.length ? checkedTags.join("、") : "無"}）`;
+          }
         } else {
-          await OneSignal.User.PushSubscription.optOut();
+          await sdk.User.PushSubscription.optOut();
+          if (statusEl) {
+            statusEl.textContent = "已關閉通知偏好設定";
+          }
         }
       } catch (err) {
         console.warn("OneSignal sync error:", err);
+        if (statusEl) {
+          statusEl.textContent = `推播同步失敗：${err && err.message ? err.message : "請稍後再試"}`;
+        }
       }
     }
 
@@ -491,7 +527,7 @@
       const saved = JSON.parse(localStorage.getItem(NOTIFY_STORAGE_KEY) || "{}");
       if (saved.enabled) {
         const tags = Array.isArray(saved.tags) ? saved.tags : [...TAGS];
-        syncOneSignalSubscription(true, tags);
+        syncOneSignalSubscription(true, tags, false);
       }
     }
 
@@ -517,13 +553,13 @@
         checkbox.checked = subscribedTags.includes(tag);
         checkbox.disabled = !isEnabled;
 
-        checkbox.addEventListener("change", savePref);
+        checkbox.addEventListener("change", () => savePref(false));
         label.appendChild(checkbox);
         label.appendChild(document.createTextNode(tag));
         checksContainer.appendChild(label);
       });
 
-      async function savePref() {
+      async function savePref(requestPermIfNeeded = false) {
         const checkedTags = Array.from(
           checksContainer.querySelectorAll('input[type="checkbox"]:checked')
         ).map((el) => el.value);
@@ -537,7 +573,7 @@
           ? `已儲存通知偏好（目前勾選：${checkedTags.length ? checkedTags.join("、") : "無"}）`
           : "已關閉通知偏好設定";
 
-        await syncOneSignalSubscription(enabledEl.checked, checkedTags);
+        await syncOneSignalSubscription(enabledEl.checked, checkedTags, requestPermIfNeeded);
       }
 
       enabledEl.addEventListener("change", () => {
@@ -545,7 +581,7 @@
         allBoxes.forEach((box) => {
           box.disabled = !enabledEl.checked;
         });
-        savePref();
+        savePref(enabledEl.checked);
       });
 
       if (saved.enabled !== undefined) {
