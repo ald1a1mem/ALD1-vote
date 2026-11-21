@@ -301,7 +301,7 @@
       },
     ];
 
-    // 投票資料：投票名稱、投票APP、開始時間、結束時間、標籤（結束時間過了會自動隱藏）
+    // 投票資料：投票名稱、投票APP、開始時間、結束時間、標籤（日期寫 / 或 - 皆可）
     const VOTES = [
       {
         title: "KPOP 新人獎總決賽",
@@ -314,7 +314,11 @@
 
     let selectedTag = "全部";
 
-    // 將行程的日期(YYYY/MM/DD 或 YYYY-MM-DD)與時間(HH:MM)轉為台灣時間 timestamp
+    // 自動把 2026/11/20 轉成 2026-11-20 讓瀏覽器正確讀取
+    function normalizeIso(isoString) {
+      return isoString.replace(/\//g, "-");
+    }
+
     function getScheduleTimestamp(dateStr, timeStr) {
       const normalizedDate = dateStr.replace(/\//g, "-");
       const timePart = timeStr && timeStr.includes(":") ? timeStr : "23:59";
@@ -322,7 +326,7 @@
     }
 
     function formatTaiwanDateTime(isoString) {
-      const date = new Date(isoString);
+      const date = new Date(normalizeIso(isoString));
       return new Intl.DateTimeFormat("zh-TW", {
         timeZone: "Asia/Taipei",
         year: "numeric",
@@ -336,8 +340,8 @@
 
     function getVoteStatus(startIso, endIso) {
       const now = Date.now();
-      const start = new Date(startIso).getTime();
-      const end = new Date(endIso).getTime();
+      const start = new Date(normalizeIso(startIso)).getTime();
+      const end = new Date(normalizeIso(endIso)).getTime();
       if (now < start) return "尚未開始";
       if (now > end) return "已結束";
       return "進行中";
@@ -367,7 +371,6 @@
       const list = document.getElementById("scheduleList");
       const now = Date.now();
 
-      // 先過濾掉已過期的行程，並依時間由近到遠排序
       const upcoming = SCHEDULES
         .filter((item) => getScheduleTimestamp(item.date, item.time) >= now)
         .sort((a, b) => getScheduleTimestamp(a.date, a.time) - getScheduleTimestamp(b.date, b.time));
@@ -396,10 +399,9 @@
       const list = document.getElementById("voteList");
       const now = Date.now();
 
-      // 先過濾掉已結束的投票，並依結束時間由近到遠排序
       const activeVotes = VOTES
-        .filter((item) => new Date(item.endTime).getTime() >= now)
-        .sort((a, b) => new Date(a.endTime).getTime() - new Date(b.endTime).getTime());
+        .filter((item) => new Date(normalizeIso(item.endTime)).getTime() >= now)
+        .sort((a, b) => new Date(normalizeIso(a.endTime)).getTime() - new Date(normalizeIso(b.endTime)).getTime());
 
       const filtered = selectedTag === "全部"
         ? activeVotes
