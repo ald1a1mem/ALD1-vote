@@ -59,7 +59,9 @@
         sdkRef = OneSignal;
         await OneSignal.init({
           appId: APP_ID,
-          allowLocalhostAsSecureOrigin: true
+          allowLocalhostAsSecureOrigin: true,
+          serviceWorkerParam: { scope: "/ALD1-vote/" },
+          serviceWorkerPath: "/ALD1-vote/OneSignalSDKWorker.js"
         });
         ready = true;
         showMsg("狀態：推播工具已準備好！請點上面的按鈕。");
