@@ -301,6 +301,12 @@
         time: "21:20",
         tag: "俊抒"
       },
+      {
+        title: "MAMA AWARDS",
+        date: "2026/11/20",
+        time: "17:00",
+        tag: "團體"
+      },
     ];
 
     // 投票資料：投票名稱、投票APP、開始時間、結束時間、標籤（日期寫 / 或 - 皆可）
@@ -382,7 +388,7 @@
         : upcoming.filter((item) => item.tag === selectedTag);
 
       if (filtered.length === 0) {
-        list.innerHTML = `<div class="empty-msg">目前沒有「${selectedTag}」的即將到來行程</div>`;
+        list.innerHTML = `<div class="empty-msg">目前沒有「${selectedTag}」的行程</div>`;
         return;
       }
 
@@ -410,7 +416,7 @@
         : activeVotes.filter((item) => item.tag === selectedTag);
 
       if (filtered.length === 0) {
-        list.innerHTML = `<div class="empty-msg">目前沒有「${selectedTag}」的進行中或即將開始投票</div>`;
+        list.innerHTML = `<div class="empty-msg">目前沒有進行中或即將開始的投票</div>`;
         return;
       }
 
