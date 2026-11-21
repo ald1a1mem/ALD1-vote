@@ -4,6 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ALD1行程/投票</title>
+  <link id="custom-favicon" rel="icon" type="image/png" href="https://github.com/ald1a1mem.png">
+
   <style>
     :root {
       --bg: #FFFFFF;
@@ -265,53 +267,59 @@
   <script>
     const TAGS = ["團體", "俊抒", "ARNO", "LEO", "虔佑", "相沅", "鑫隆", "安信", "相炫"];
 
-    // 行程資料：日期、時間、行程名稱、標籤
+    // 行程資料：日期、時間、行程名稱、標籤（時間過了會自動隱藏）
     const SCHEDULES = [
       {
         title: "Dream Festival 2026",
-        date: "2026-11-23",
+        date: "2026/11/23",
         time: "14:00",
         tag: "團體"
       },
       {
         title: "一對一合照",
-        date: "2026-11-26",
+        date: "2026/11/26",
         time: "15:00",
         tag: "團體"
       },
       {
         title: "面對面簽售",
-        date: "2026-11-26",
+        date: "2026/11/26",
         time: "18:00",
         tag: "團體"
-      },  
+      },
       {
         title: "一對一影通",
-        date: "2026-11-26",
+        date: "2026/11/26",
         time: "20:00",
         tag: "團體"
       },
       {
         title: "環環相扣的故事",
-        date: "2026-11-26",
+        date: "2026/11/26",
         time: "21:20",
         tag: "俊抒"
-      },      
+      },
     ];
 
-    // 投票資料：投票名稱、投票APP、開始時間、結束時間、標籤（皆使用 +08:00 台灣時間）
+    // 投票資料：投票名稱、投票APP、開始時間、結束時間、標籤（結束時間過了會自動隱藏）
     const VOTES = [
       {
         title: "KPOP 新人獎總決賽",
         app: "THEFAN、my1pick",
-        startTime: "2026-11-20T12:00:00+08:00",
-        endTime: "2026-11-28T22:59:59+08:00",
+        startTime: "2026/11/20T12:00:00+08:00",
+        endTime: "2026/11/28T22:59:59+08:00",
         tag: "團體"
       },
-
     ];
 
     let selectedTag = "全部";
+
+    // 將行程的日期(YYYY/MM/DD 或 YYYY-MM-DD)與時間(HH:MM)轉為台灣時間 timestamp
+    function getScheduleTimestamp(dateStr, timeStr) {
+      const normalizedDate = dateStr.replace(/\//g, "-");
+      const timePart = timeStr && timeStr.includes(":") ? timeStr : "23:59";
+      return new Date(`${normalizedDate}T${timePart}:00+08:00`).getTime();
+    }
 
     function formatTaiwanDateTime(isoString) {
       const date = new Date(isoString);
@@ -357,12 +365,19 @@
 
     function renderSchedules() {
       const list = document.getElementById("scheduleList");
+      const now = Date.now();
+
+      // 先過濾掉已過期的行程，並依時間由近到遠排序
+      const upcoming = SCHEDULES
+        .filter((item) => getScheduleTimestamp(item.date, item.time) >= now)
+        .sort((a, b) => getScheduleTimestamp(a.date, a.time) - getScheduleTimestamp(b.date, b.time));
+
       const filtered = selectedTag === "全部"
-        ? SCHEDULES
-        : SCHEDULES.filter((item) => item.tag === selectedTag);
+        ? upcoming
+        : upcoming.filter((item) => item.tag === selectedTag);
 
       if (filtered.length === 0) {
-        list.innerHTML = `<div class="empty-msg">目前沒有「${selectedTag}」的行程</div>`;
+        list.innerHTML = `<div class="empty-msg">目前沒有「${selectedTag}」的即將到來行程</div>`;
         return;
       }
 
@@ -370,7 +385,7 @@
         <div class="card">
           <div class="card-main">
             <div class="card-title">${item.title}</div>
-            <div class="card-meta">日期：${item.date}　時間：${item.time}（GMT+8）</div>
+            <div class="card-meta">日期：${item.date}　時間：${item.time}</div>
           </div>
           <span class="card-badge">${item.tag}</span>
         </div>
@@ -379,12 +394,19 @@
 
     function renderVotes() {
       const list = document.getElementById("voteList");
+      const now = Date.now();
+
+      // 先過濾掉已結束的投票，並依結束時間由近到遠排序
+      const activeVotes = VOTES
+        .filter((item) => new Date(item.endTime).getTime() >= now)
+        .sort((a, b) => new Date(a.endTime).getTime() - new Date(b.endTime).getTime());
+
       const filtered = selectedTag === "全部"
-        ? VOTES
-        : VOTES.filter((item) => item.tag === selectedTag);
+        ? activeVotes
+        : activeVotes.filter((item) => item.tag === selectedTag);
 
       if (filtered.length === 0) {
-        list.innerHTML = `<div class="empty-msg">目前沒有「${selectedTag}」的投票</div>`;
+        list.innerHTML = `<div class="empty-msg">目前沒有「${selectedTag}」的進行中或即將開始投票</div>`;
         return;
       }
 
@@ -398,8 +420,8 @@
                 <span class="status-tag">${status}</span>
               </div>
               <div class="card-meta">投票APP：${item.app}</div>
-              <div class="card-meta">開始：${formatTaiwanDateTime(item.startTime)}（GMT+8）</div>
-              <div class="card-meta">結束：${formatTaiwanDateTime(item.endTime)}（GMT+8）</div>
+              <div class="card-meta">開始：${formatTaiwanDateTime(item.startTime)}</div>
+              <div class="card-meta">結束：${formatTaiwanDateTime(item.endTime)}</div>
             </div>
             <span class="card-badge">${item.tag}</span>
           </div>
