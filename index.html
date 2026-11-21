@@ -5,8 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ALD1行程/投票</title>
   <link id="custom-favicon" rel="icon" type="image/png" href="https://github.com/ald1a1mem.png">
-  <style>
-
 
   <style>
     :root {
@@ -416,7 +414,7 @@
         : activeVotes.filter((item) => item.tag === selectedTag);
 
       if (filtered.length === 0) {
-        list.innerHTML = `<div class="empty-msg">目前沒有進行中或即將開始的投票</div>`;
+        list.innerHTML = `<div class="empty-msg">目前沒有「${selectedTag}」的進行中或即將開始投票</div>`;
         return;
       }
 
