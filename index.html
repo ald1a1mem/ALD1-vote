@@ -6,8 +6,6 @@
   <title>ALD1行程/投票</title>
   <link id="custom-favicon" rel="icon" type="image/png" href="https://github.com/ald1a1mem.png">
 
-  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.js" defer></script>
-
   <style>
     :root {
       --bg: #FFFFFF;
@@ -164,63 +162,6 @@
       text-align: center;
     }
 
-    /* 通知設定區 */
-    .notify-box {
-      border: 1px solid var(--accent-border);
-      border-radius: 12px;
-      padding: 16px;
-      background: var(--accent-soft);
-    }
-
-    .notify-toggle-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      margin-bottom: 12px;
-    }
-
-    .notify-sub {
-      font-size: 0.88rem;
-      color: var(--accent-deep);
-      margin: 0 0 12px;
-    }
-
-    .notify-tip {
-      font-size: 0.82rem;
-      color: var(--accent-deep);
-      margin: 10px 0 0;
-      opacity: 0.9;
-    }
-
-    .member-checks {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px 14px;
-    }
-
-    .member-check-item {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 0.9rem;
-      color: var(--accent-deep);
-      cursor: pointer;
-    }
-
-    .member-check-item input {
-      accent-color: var(--accent);
-      cursor: pointer;
-    }
-
-    .notify-saved {
-      margin-top: 10px;
-      font-size: 0.84rem;
-      color: var(--accent-deep);
-      min-height: 1.2em;
-      word-break: break-word;
-    }
-
     /* 最底部固定來源 */
     footer {
       width: 100%;
@@ -254,31 +195,12 @@
       <h2>投票</h2>
       <div class="list" id="voteList"></div>
     </section>
-
-    <!-- 通知設定 -->
-    <section>
-      <h2>通知設定</h2>
-      <div class="notify-box">
-        <div class="notify-toggle-row">
-          <label for="notifyEnabled" style="font-weight: 600; color: var(--accent-deep); cursor: pointer;">
-            接收「新增行程」與「投票時間」通知
-          </label>
-          <input type="checkbox" id="notifyEnabled" style="width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer;" />
-        </div>
-        <p class="notify-sub">勾選你想接收通知的標籤：</p>
-        <div class="member-checks" id="notifyMemberChecks"></div>
-        <div class="notify-saved" id="notifyStatus"></div>
-        <p class="notify-tip">※ iPhone 使用者若要接收推播，請先將本頁「加入主畫面」後再開啟通知。</p>
-      </div>
-    </section>
   </div>
 
   <footer>@ald1.a1mem</footer>
 
   <script>
-    const ONESIGNAL_APP_ID = "a9d9082b-0e43-4ba1-b5fb-9f444247f0f8";
     const TAGS = ["團體", "俊抒", "ARNO", "LEO", "虔佑", "相沅", "鑫隆", "安信", "相炫"];
-    const NOTIFY_STORAGE_KEY = "ald1_notify_pref_v1";
 
     // 行程資料：日期、時間、行程名稱、標籤（時間過了會自動隱藏）
     const SCHEDULES = [
@@ -338,19 +260,6 @@
     ];
 
     let selectedTag = "全部";
-    let oneSignalReady = false;
-    let oneSignalInstance = null;
-
-    window.OneSignalDeferred = window.OneSignalDeferred || [];
-    OneSignalDeferred.push(async function(OneSignal) {
-      oneSignalInstance = OneSignal;
-      await OneSignal.init({
-        appId: ONESIGNAL_APP_ID,
-        allowLocalhostAsSecureOrigin: true
-      });
-      oneSignalReady = true;
-      syncOneSignalFromSavedPref();
-    });
 
     function normalizeIso(isoString) {
       return isoString.replace(/\//g, "-");
@@ -419,6 +328,62 @@
       if (filtered.length === 0) {
         list.innerHTML = `<div class="empty-msg">目前沒有「${selectedTag}」的行程</div>`;
         return;
+      }
+
+      list.innerHTML = filtered.map((item) => `
+        <div class="card">
+          <div class="card-main">
+            <div class="card-title">${item.title}</div>
+            <div class="card-meta">日期：${item.date}　時間：${item.time}</div>
+          </div>
+          <span class="card-badge">${item.tag}</span>
+        </div>
+      `).join("");
+    }
+
+    function renderVotes() {
+      const list = document.getElementById("voteList");
+      const now = Date.now();
+
+      const activeVotes = VOTES
+        .filter((item) => new Date(normalizeIso(item.endTime)).getTime() >= now)
+        .sort((a, b) => new Date(normalizeIso(a.endTime)).getTime() - new Date(normalizeIso(b.endTime)).getTime());
+
+      const filtered = selectedTag === "全部"
+        ? activeVotes
+        : activeVotes.filter((item) => item.tag === selectedTag);
+
+      if (filtered.length === 0) {
+        list.innerHTML = `<div class="empty-msg">目前沒有「${selectedTag}」進行中或即將開始的投票</div>`;
+        return;
+      }
+
+      list.innerHTML = filtered.map((item) => {
+        const status = getVoteStatus(item.startTime, item.endTime);
+        return `
+          <div class="card">
+            <div class="card-main">
+              <div class="card-title">
+                ${item.title}
+                <span class="status-tag">${status}</span>
+              </div>
+              <div class="card-meta">投票APP：${item.app}</div>
+              <div class="card-meta">開始：${formatTaiwanDateTime(item.startTime)}</div>
+              <div class="card-meta">結束：${formatTaiwanDateTime(item.endTime)}</div>
+            </div>
+            <span class="card-badge">${item.tag}</span>
+          </div>
+        `;
+      }).join("");
+    }
+
+    renderFilterBar();
+    renderSchedules();
+    renderVotes();
+  </script>
+</body>
+</html>
+      return;
       }
 
       list.innerHTML = filtered.map((item) => `
