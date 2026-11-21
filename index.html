@@ -6,6 +6,8 @@
   <title>ALD1行程/投票</title>
   <link id="custom-favicon" rel="icon" type="image/png" href="https://github.com/ald1a1mem.png">
 
+  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.js" defer></script>
+
   <style>
     :root {
       --bg: #FFFFFF;
@@ -184,6 +186,13 @@
       margin: 0 0 12px;
     }
 
+    .notify-tip {
+      font-size: 0.82rem;
+      color: var(--accent-deep);
+      margin: 10px 0 0;
+      opacity: 0.9;
+    }
+
     .member-checks {
       display: flex;
       flex-wrap: wrap;
@@ -245,7 +254,7 @@
       <div class="list" id="voteList"></div>
     </section>
 
-    <!-- 通知設定（預留日後接推播） -->
+    <!-- 通知設定 -->
     <section>
       <h2>通知設定</h2>
       <div class="notify-box">
@@ -255,9 +264,10 @@
           </label>
           <input type="checkbox" id="notifyEnabled" style="width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer;" />
         </div>
-        <p class="notify-sub">勾選你想接收通知的標籤（日後接通推播服務後將依此發送）：</p>
+        <p class="notify-sub">勾選你想接收通知的標籤：</p>
         <div class="member-checks" id="notifyMemberChecks"></div>
         <div class="notify-saved" id="notifyStatus"></div>
+        <p class="notify-tip">※ iPhone 使用者若要接收推播，請先將本頁「加入主畫面」後再開啟通知。</p>
       </div>
     </section>
   </div>
@@ -265,6 +275,7 @@
   <footer>@ald1.a1mem</footer>
 
   <script>
+    const ONESIGNAL_APP_ID = "a9d9082b-0e43-4ba1-b5fb-9f444247f0f8";
     const TAGS = ["團體", "俊抒", "ARNO", "LEO", "虔佑", "相沅", "鑫隆", "安信", "相炫"];
 
     // 行程資料：日期、時間、行程名稱、標籤（時間過了會自動隱藏）
@@ -319,8 +330,18 @@
     ];
 
     let selectedTag = "全部";
+    let oneSignalReady = false;
 
-    // 自動把 2026/11/20 轉成 2026-11-20 讓瀏覽器正確讀取
+    window.OneSignalDeferred = window.OneSignalDeferred || [];
+    OneSignalDeferred.push(async function(OneSignal) {
+      await OneSignal.init({
+        appId: ONESIGNAL_APP_ID,
+        allowLocalhostAsSecureOrigin: true
+      });
+      oneSignalReady = true;
+      syncOneSignalFromSavedPref();
+    });
+
     function normalizeIso(isoString) {
       return isoString.replace(/\//g, "-");
     }
@@ -414,7 +435,7 @@
         : activeVotes.filter((item) => item.tag === selectedTag);
 
       if (filtered.length === 0) {
-        list.innerHTML = `<div class="empty-msg">目前沒有「${selectedTag}」進行中或即將開始的投票</div>`;
+        list.innerHTML = `<div class="empty-msg">目前沒有「${selectedTag}」的進行中或即將開始投票</div>`;
         return;
       }
 
@@ -437,13 +458,43 @@
       }).join("");
     }
 
+    const NOTIFY_STORAGE_KEY = "ald1_notify_pref_v1";
+
+    async function syncOneSignalSubscription(enabled, checkedTags) {
+      if (!oneSignalReady || !window.OneSignal) return;
+      try {
+        if (enabled) {
+          if (!OneSignal.Notifications.permission) {
+            await OneSignal.Notifications.requestPermission();
+          }
+          await OneSignal.User.PushSubscription.optIn();
+          const tagPayload = {};
+          TAGS.forEach((t) => {
+            tagPayload[`tag_${t}`] = checkedTags.includes(t) ? "1" : "0";
+          });
+          await OneSignal.User.addTags(tagPayload);
+        } else {
+          await OneSignal.User.PushSubscription.optOut();
+        }
+      } catch (err) {
+        console.warn("OneSignal sync error:", err);
+      }
+    }
+
+    function syncOneSignalFromSavedPref() {
+      const saved = JSON.parse(localStorage.getItem(NOTIFY_STORAGE_KEY) || "{}");
+      if (saved.enabled) {
+        const tags = Array.isArray(saved.tags) ? saved.tags : [...TAGS];
+        syncOneSignalSubscription(true, tags);
+      }
+    }
+
     function initNotifySettings() {
-      const STORAGE_KEY = "ald1_notify_pref_v1";
       const enabledEl = document.getElementById("notifyEnabled");
       const checksContainer = document.getElementById("notifyMemberChecks");
       const statusEl = document.getElementById("notifyStatus");
 
-      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+      const saved = JSON.parse(localStorage.getItem(NOTIFY_STORAGE_KEY) || "{}");
       const isEnabled = Boolean(saved.enabled);
       const subscribedTags = Array.isArray(saved.tags) ? saved.tags : [...TAGS];
 
@@ -466,12 +517,12 @@
         checksContainer.appendChild(label);
       });
 
-      function savePref() {
+      async function savePref() {
         const checkedTags = Array.from(
           checksContainer.querySelectorAll('input[type="checkbox"]:checked')
         ).map((el) => el.value);
 
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        localStorage.setItem(NOTIFY_STORAGE_KEY, JSON.stringify({
           enabled: enabledEl.checked,
           tags: checkedTags
         }));
@@ -479,6 +530,8 @@
         statusEl.textContent = enabledEl.checked
           ? `已儲存通知偏好（目前勾選：${checkedTags.length ? checkedTags.join("、") : "無"}）`
           : "已關閉通知偏好設定";
+
+        await syncOneSignalSubscription(enabledEl.checked, checkedTags);
       }
 
       enabledEl.addEventListener("change", () => {
