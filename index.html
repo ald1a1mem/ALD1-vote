@@ -414,7 +414,7 @@
         : activeVotes.filter((item) => item.tag === selectedTag);
 
       if (filtered.length === 0) {
-        list.innerHTML = `<div class="empty-msg">目前沒有「${selectedTag}」的進行中或即將開始投票</div>`;
+        list.innerHTML = `<div class="empty-msg">目前沒有「${selectedTag}」進行中或即將開始的投票</div>`;
         return;
       }
 
