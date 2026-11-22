@@ -71,7 +71,6 @@
       color: var(--accent-deep);
     }
 
-    /* 標籤篩選區 */
     .filter-bar {
       display: flex;
       flex-wrap: wrap;
@@ -101,7 +100,6 @@
       font-weight: 600;
     }
 
-    /* 區塊標題 */
     section {
       margin-bottom: 32px;
     }
@@ -113,7 +111,6 @@
       border-bottom: 1px dashed var(--accent-border);
     }
 
-    /* 卡片列表 */
     .list {
       display: flex;
       flex-direction: column;
@@ -175,7 +172,6 @@
       text-align: center;
     }
 
-    /* 通知設定區 */
     .notify-box {
       border: 1px solid var(--accent-border);
       border-radius: 12px;
@@ -231,7 +227,6 @@
       opacity: 0.85;
     }
 
-    /* 最底部固定來源 */
     footer {
       width: 100%;
       text-align: center;
@@ -250,22 +245,18 @@
       <p class="timezone-note">時間皆使用台灣時間（GMT+8）</p>
     </header>
 
-    <!-- 標籤篩選 -->
     <nav class="filter-bar" id="filterBar" aria-label="標籤篩選"></nav>
 
-    <!-- 行程區塊 -->
     <section>
       <h2>行程</h2>
       <div class="list" id="scheduleList"></div>
     </section>
 
-    <!-- 投票區塊 -->
     <section>
       <h2>投票</h2>
       <div class="list" id="voteList"></div>
     </section>
 
-    <!-- 通知設定 -->
     <section>
       <h2>通知設定</h2>
       <div class="notify-box">
@@ -288,7 +279,6 @@
   <script>
     const TAGS = ["團體", "俊抒", "ARNO", "LEO", "虔佑", "相沅", "鑫隆", "安信", "相炫"];
 
-    // 行程資料：日期、時間、行程名稱、標籤（時間過了會自動隱藏）
     const SCHEDULES = [
       {
         title: "Dream Festival 2026",
@@ -325,10 +315,9 @@
         date: "2026/11/20",
         time: "17:00",
         tag: "團體"
-      },
+      }
     ];
 
-    // 投票資料：投票名稱、投票APP、開始時間、結束時間、標籤（日期寫 / 或 - 皆可）
     const VOTES = [
       {
         title: "KPOP 新人獎總決賽",
@@ -336,7 +325,7 @@
         startTime: "2026/11/20T12:00:00+08:00",
         endTime: "2026/11/28T22:59:59+08:00",
         tag: "團體"
-      },
+      }
     ];
 
     let selectedTag = "全部";
@@ -348,7 +337,7 @@
     function getScheduleTimestamp(dateStr, timeStr) {
       const normalizedDate = dateStr.replace(/\//g, "-");
       const timePart = timeStr && timeStr.includes(":") ? timeStr : "23:59";
-      return new Date(`${normalizedDate}T${timePart}:00+08:00`).getTime();
+      return new Date(normalizedDate + "T" + timePart + ":00+08:00").getTime();
     }
 
     function formatTaiwanDateTime(isoString) {
@@ -375,15 +364,15 @@
 
     function renderFilterBar() {
       const bar = document.getElementById("filterBar");
-      const allTags = ["全部", ...TAGS];
+      const allTags = ["全部"].concat(TAGS);
       bar.innerHTML = "";
 
-      allTags.forEach((tag) => {
+      allTags.forEach(function(tag) {
         const btn = document.createElement("button");
         btn.type = "button";
         btn.className = "tag-btn" + (selectedTag === tag ? " active" : "");
         btn.textContent = tag;
-        btn.addEventListener("click", () => {
+        btn.addEventListener("click", function() {
           selectedTag = tag;
           renderFilterBar();
           renderSchedules();
@@ -398,27 +387,27 @@
       const now = Date.now();
 
       const upcoming = SCHEDULES
-        .filter((item) => getScheduleTimestamp(item.date, item.time) >= now)
-        .sort((a, b) => getScheduleTimestamp(a.date, a.time) - getScheduleTimestamp(b.date, b.time));
+        .filter(function(item) { return getScheduleTimestamp(item.date, item.time) >= now; })
+        .sort(function(a, b) { return getScheduleTimestamp(a.date, a.time) - getScheduleTimestamp(b.date, b.time); });
 
       const filtered = selectedTag === "全部"
         ? upcoming
-        : upcoming.filter((item) => item.tag === selectedTag);
+        : upcoming.filter(function(item) { return item.tag === selectedTag; });
 
       if (filtered.length === 0) {
-        list.innerHTML = `<div class="empty-msg">目前沒有「${selectedTag}」的行程</div>`;
+        list.innerHTML = '<div class="empty-msg">目前沒有「' + selectedTag + '」的行程</div>';
         return;
       }
 
-      list.innerHTML = filtered.map((item) => `
-        <div class="card">
-          <div class="card-main">
-            <div class="card-title">${item.title}</div>
-            <div class="card-meta">日期：${item.date}　時間：${item.time}</div>
-          </div>
-          <span class="card-badge">${item.tag}</span>
-        </div>
-      `).join("");
+      list.innerHTML = filtered.map(function(item) {
+        return '<div class="card">' +
+          '<div class="card-main">' +
+            '<div class="card-title">' + item.title + '</div>' +
+            '<div class="card-meta">日期：' + item.date + '　時間：' + item.time + '</div>' +
+          '</div>' +
+          '<span class="card-badge">' + item.tag + '</span>' +
+        '</div>';
+      }).join("");
     }
 
     function renderVotes() {
@@ -426,43 +415,40 @@
       const now = Date.now();
 
       const activeVotes = VOTES
-        .filter((item) => new Date(normalizeIso(item.endTime)).getTime() >= now)
-        .sort((a, b) => new Date(normalizeIso(a.endTime)).getTime() - new Date(normalizeIso(b.endTime)).getTime());
+        .filter(function(item) { return new Date(normalizeIso(item.endTime)).getTime() >= now; })
+        .sort(function(a, b) { return new Date(normalizeIso(a.endTime)).getTime() - new Date(normalizeIso(b.endTime)).getTime(); });
 
       const filtered = selectedTag === "全部"
         ? activeVotes
-        : activeVotes.filter((item) => item.tag === selectedTag);
+        : activeVotes.filter(function(item) { return item.tag === selectedTag; });
 
       if (filtered.length === 0) {
-        list.innerHTML = `<div class="empty-msg">目前沒有「${selectedTag}」的進行中或即將開始投票</div>`;
+        list.innerHTML = '<div class="empty-msg">目前沒有「' + selectedTag + '」的進行中或即將開始投票</div>';
         return;
       }
 
-      list.innerHTML = filtered.map((item) => {
+      list.innerHTML = filtered.map(function(item) {
         const status = getVoteStatus(item.startTime, item.endTime);
-        return `
-          <div class="card">
-            <div class="card-main">
-              <div class="card-title">
-                ${item.title}
-                <span class="status-tag">${status}</span>
-              </div>
-              <div class="card-meta">投票APP：${item.app}</div>
-              <div class="card-meta">開始：${formatTaiwanDateTime(item.startTime)}</div>
-              <div class="card-meta">結束：${formatTaiwanDateTime(item.endTime)}</div>
-            </div>
-            <span class="card-badge">${item.tag}</span>
-          </div>
-        `;
+        return '<div class="card">' +
+          '<div class="card-main">' +
+            '<div class="card-title">' +
+              item.title +
+              '<span class="status-tag">' + status + '</span>' +
+            '</div>' +
+            '<div class="card-meta">投票APP：' + item.app + '</div>' +
+            '<div class="card-meta">開始：' + formatTaiwanDateTime(item.startTime) + '</div>' +
+            '<div class="card-meta">結束：' + formatTaiwanDateTime(item.endTime) + '</div>' +
+          '</div>' +
+          '<span class="card-badge">' + item.tag + '</span>' +
+        '</div>';
       }).join("");
     }
 
-    // 同步標籤狀態到 OneSignal
     function syncTagsToOneSignal(checkedTags) {
       window.OneSignalDeferred = window.OneSignalDeferred || [];
       OneSignalDeferred.push(async function(OneSignal) {
         const tagPayload = {};
-        TAGS.forEach((tag) => {
+        TAGS.forEach(function(tag) {
           tagPayload[tag] = checkedTags.includes(tag) ? "1" : "";
         });
         await OneSignal.User.addTags(tagPayload);
@@ -477,12 +463,12 @@
 
       const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
       const isEnabled = Boolean(saved.enabled);
-      const subscribedTags = Array.isArray(saved.tags) ? saved.tags : [...TAGS];
+      const subscribedTags = Array.isArray(saved.tags) ? saved.tags : TAGS.slice();
 
       enabledEl.checked = isEnabled;
       checksContainer.innerHTML = "";
 
-      TAGS.forEach((tag) => {
+      TAGS.forEach(function(tag) {
         const label = document.createElement("label");
         label.className = "member-check-item";
 
@@ -501,7 +487,7 @@
       function getCheckedTags() {
         return Array.from(
           checksContainer.querySelectorAll('input[type="checkbox"]:checked')
-        ).map((el) => el.value);
+        ).map(function(el) { return el.value; });
       }
 
       function savePref() {
@@ -514,15 +500,15 @@
 
         if (enabledEl.checked) {
           syncTagsToOneSignal(checkedTags);
-          statusEl.textContent = `已開啟並儲存通知偏好（目前勾選：${checkedTags.length ? checkedTags.join("、") : "無"}）`;
+          statusEl.textContent = "已開啟並儲存通知偏好（目前勾選：" + (checkedTags.length ? checkedTags.join("、") : "無") + "）";
         } else {
           statusEl.textContent = "已關閉通知偏好設定";
         }
       }
 
-      enabledEl.addEventListener("change", () => {
+      enabledEl.addEventListener("change", function() {
         const allBoxes = checksContainer.querySelectorAll('input[type="checkbox"]');
-        allBoxes.forEach((box) => {
+        allBoxes.forEach(function(box) {
           box.disabled = !enabledEl.checked;
         });
 
@@ -535,9 +521,8 @@
                 await OneSignal.User.PushSubscription.optIn();
                 savePref();
               } else {
-                // 使用者拒絕權限時還原勾選狀態
                 enabledEl.checked = false;
-                allBoxes.forEach((box) => { box.disabled = true; });
+                allBoxes.forEach(function(box) { box.disabled = true; });
                 localStorage.setItem(STORAGE_KEY, JSON.stringify({ enabled: false, tags: getCheckedTags() }));
                 statusEl.textContent = "瀏覽器通知權限未允許，請至瀏覽器設定開啟後再試";
               }
@@ -553,96 +538,7 @@
 
       if (saved.enabled !== undefined) {
         statusEl.textContent = enabledEl.checked
-          ? `已開啟並儲存通知偏好（目前勾選：${subscribedTags.length ? subscribedTags.join("、") : "無"}）`
-          : "已關閉通知偏好設定";
-      }
-    }
-
-    renderFilterBar();
-    renderSchedules();
-    renderVotes();
-    initNotifySettings();
-  </script>
-</body>
-</html>
-st.innerHTML = `<div class="empty-msg">目前沒有「${selectedTag}」的進行中或即將開始投票</div>`;
-        return;
-      }
-
-      list.innerHTML = filtered.map((item) => {
-        const status = getVoteStatus(item.startTime, item.endTime);
-        return `
-          <div class="card">
-            <div class="card-main">
-              <div class="card-title">
-                ${item.title}
-                <span class="status-tag">${status}</span>
-              </div>
-              <div class="card-meta">投票APP：${item.app}</div>
-              <div class="card-meta">開始：${formatTaiwanDateTime(item.startTime)}</div>
-              <div class="card-meta">結束：${formatTaiwanDateTime(item.endTime)}</div>
-            </div>
-            <span class="card-badge">${item.tag}</span>
-          </div>
-        `;
-      }).join("");
-    }
-
-    function initNotifySettings() {
-      const STORAGE_KEY = "ald1_notify_pref_v1";
-      const enabledEl = document.getElementById("notifyEnabled");
-      const checksContainer = document.getElementById("notifyMemberChecks");
-      const statusEl = document.getElementById("notifyStatus");
-
-      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
-      const isEnabled = Boolean(saved.enabled);
-      const subscribedTags = Array.isArray(saved.tags) ? saved.tags : [...TAGS];
-
-      enabledEl.checked = isEnabled;
-      checksContainer.innerHTML = "";
-
-      TAGS.forEach((tag) => {
-        const label = document.createElement("label");
-        label.className = "member-check-item";
-
-        const checkbox = document.createElement("input");
-        checkbox.type = "checkbox";
-        checkbox.value = tag;
-        checkbox.checked = subscribedTags.includes(tag);
-        checkbox.disabled = !isEnabled;
-
-        checkbox.addEventListener("change", savePref);
-        label.appendChild(checkbox);
-        label.appendChild(document.createTextNode(tag));
-        checksContainer.appendChild(label);
-      });
-
-      function savePref() {
-        const checkedTags = Array.from(
-          checksContainer.querySelectorAll('input[type="checkbox"]:checked')
-        ).map((el) => el.value);
-
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({
-          enabled: enabledEl.checked,
-          tags: checkedTags
-        }));
-
-        statusEl.textContent = enabledEl.checked
-          ? `已儲存通知偏好（目前勾選：${checkedTags.length ? checkedTags.join("、") : "無"}）`
-          : "已關閉通知偏好設定";
-      }
-
-      enabledEl.addEventListener("change", () => {
-        const allBoxes = checksContainer.querySelectorAll('input[type="checkbox"]');
-        allBoxes.forEach((box) => {
-          box.disabled = !enabledEl.checked;
-        });
-        savePref();
-      });
-
-      if (saved.enabled !== undefined) {
-        statusEl.textContent = enabledEl.checked
-          ? `已儲存通知偏好（目前勾選：${subscribedTags.length ? subscribedTags.join("、") : "無"}）`
+          ? "已開啟並儲存通知偏好（目前勾選：" + (subscribedTags.length ? subscribedTags.join("、") : "無") + "）"
           : "已關閉通知偏好設定";
       }
     }
