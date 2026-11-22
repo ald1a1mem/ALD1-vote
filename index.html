@@ -6,6 +6,19 @@
   <title>ALD1行程/投票</title>
   <link id="custom-favicon" rel="icon" type="image/png" href="https://github.com/ald1a1mem.png">
 
+  <!-- OneSignal Web Push SDK -->
+  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+  <script>
+    window.OneSignalDeferred = window.OneSignalDeferred || [];
+    OneSignalDeferred.push(async function(OneSignal) {
+      await OneSignal.init({
+        appId: "9f0bcd11-6196-4e36-823a-4ad17a9b07ad",
+        serviceWorkerParam: { scope: "/ALD1-vote/" },
+        serviceWorkerPath: "/ALD1-vote/OneSignalSDKWorker.js"
+      });
+    });
+  </script>
+
   <style>
     :root {
       --bg: #FFFFFF;
@@ -211,6 +224,13 @@
       min-height: 1.2em;
     }
 
+    .notify-hint {
+      margin-top: 8px;
+      font-size: 0.8rem;
+      color: var(--accent-deep);
+      opacity: 0.85;
+    }
+
     /* 最底部固定來源 */
     footer {
       width: 100%;
@@ -245,7 +265,7 @@
       <div class="list" id="voteList"></div>
     </section>
 
-    <!-- 通知設定（預留日後接推播） -->
+    <!-- 通知設定 -->
     <section>
       <h2>通知設定</h2>
       <div class="notify-box">
@@ -255,9 +275,10 @@
           </label>
           <input type="checkbox" id="notifyEnabled" style="width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer;" />
         </div>
-        <p class="notify-sub">勾選你想接收通知的標籤（日後接通推播服務後將依此發送）：</p>
+        <p class="notify-sub">勾選你想接收通知的標籤（系統將依勾選標籤發送推播）：</p>
         <div class="member-checks" id="notifyMemberChecks"></div>
         <div class="notify-saved" id="notifyStatus"></div>
+        <div class="notify-hint">※ iPhone / iPad 用戶請先將網頁「加入主畫面」後再開啟通知。</div>
       </div>
     </section>
   </div>
@@ -320,7 +341,6 @@
 
     let selectedTag = "全部";
 
-    // 自動把 2026/11/20 轉成 2026-11-20 讓瀏覽器正確讀取
     function normalizeIso(isoString) {
       return isoString.replace(/\//g, "-");
     }
@@ -415,6 +435,137 @@
 
       if (filtered.length === 0) {
         list.innerHTML = `<div class="empty-msg">目前沒有「${selectedTag}」的進行中或即將開始投票</div>`;
+        return;
+      }
+
+      list.innerHTML = filtered.map((item) => {
+        const status = getVoteStatus(item.startTime, item.endTime);
+        return `
+          <div class="card">
+            <div class="card-main">
+              <div class="card-title">
+                ${item.title}
+                <span class="status-tag">${status}</span>
+              </div>
+              <div class="card-meta">投票APP：${item.app}</div>
+              <div class="card-meta">開始：${formatTaiwanDateTime(item.startTime)}</div>
+              <div class="card-meta">結束：${formatTaiwanDateTime(item.endTime)}</div>
+            </div>
+            <span class="card-badge">${item.tag}</span>
+          </div>
+        `;
+      }).join("");
+    }
+
+    // 同步標籤狀態到 OneSignal
+    function syncTagsToOneSignal(checkedTags) {
+      window.OneSignalDeferred = window.OneSignalDeferred || [];
+      OneSignalDeferred.push(async function(OneSignal) {
+        const tagPayload = {};
+        TAGS.forEach((tag) => {
+          tagPayload[tag] = checkedTags.includes(tag) ? "1" : "";
+        });
+        await OneSignal.User.addTags(tagPayload);
+      });
+    }
+
+    function initNotifySettings() {
+      const STORAGE_KEY = "ald1_notify_pref_v1";
+      const enabledEl = document.getElementById("notifyEnabled");
+      const checksContainer = document.getElementById("notifyMemberChecks");
+      const statusEl = document.getElementById("notifyStatus");
+
+      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+      const isEnabled = Boolean(saved.enabled);
+      const subscribedTags = Array.isArray(saved.tags) ? saved.tags : [...TAGS];
+
+      enabledEl.checked = isEnabled;
+      checksContainer.innerHTML = "";
+
+      TAGS.forEach((tag) => {
+        const label = document.createElement("label");
+        label.className = "member-check-item";
+
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.value = tag;
+        checkbox.checked = subscribedTags.includes(tag);
+        checkbox.disabled = !isEnabled;
+
+        checkbox.addEventListener("change", savePref);
+        label.appendChild(checkbox);
+        label.appendChild(document.createTextNode(tag));
+        checksContainer.appendChild(label);
+      });
+
+      function getCheckedTags() {
+        return Array.from(
+          checksContainer.querySelectorAll('input[type="checkbox"]:checked')
+        ).map((el) => el.value);
+      }
+
+      function savePref() {
+        const checkedTags = getCheckedTags();
+
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+          enabled: enabledEl.checked,
+          tags: checkedTags
+        }));
+
+        if (enabledEl.checked) {
+          syncTagsToOneSignal(checkedTags);
+          statusEl.textContent = `已開啟並儲存通知偏好（目前勾選：${checkedTags.length ? checkedTags.join("、") : "無"}）`;
+        } else {
+          statusEl.textContent = "已關閉通知偏好設定";
+        }
+      }
+
+      enabledEl.addEventListener("change", () => {
+        const allBoxes = checksContainer.querySelectorAll('input[type="checkbox"]');
+        allBoxes.forEach((box) => {
+          box.disabled = !enabledEl.checked;
+        });
+
+        window.OneSignalDeferred = window.OneSignalDeferred || [];
+        OneSignalDeferred.push(async function(OneSignal) {
+          if (enabledEl.checked) {
+            try {
+              await OneSignal.Notifications.requestPermission();
+              if (OneSignal.Notifications.permission) {
+                await OneSignal.User.PushSubscription.optIn();
+                savePref();
+              } else {
+                // 使用者拒絕權限時還原勾選狀態
+                enabledEl.checked = false;
+                allBoxes.forEach((box) => { box.disabled = true; });
+                localStorage.setItem(STORAGE_KEY, JSON.stringify({ enabled: false, tags: getCheckedTags() }));
+                statusEl.textContent = "瀏覽器通知權限未允許，請至瀏覽器設定開啟後再試";
+              }
+            } catch (err) {
+              statusEl.textContent = "通知啟用失敗，請確認已上傳 OneSignalSDKWorker.js 或使用支援推播的瀏覽器";
+            }
+          } else {
+            await OneSignal.User.PushSubscription.optOut();
+            savePref();
+          }
+        });
+      });
+
+      if (saved.enabled !== undefined) {
+        statusEl.textContent = enabledEl.checked
+          ? `已開啟並儲存通知偏好（目前勾選：${subscribedTags.length ? subscribedTags.join("、") : "無"}）`
+          : "已關閉通知偏好設定";
+      }
+    }
+
+    renderFilterBar();
+    renderSchedules();
+    renderVotes();
+    initNotifySettings();
+  </script>
+</body>
+</html>
+st.innerHTML = `<div class="empty-msg">目前沒有「${selectedTag}」的進行中或即將開始投票</div>`;
         return;
       }
 
